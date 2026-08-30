@@ -25,7 +25,7 @@ nothing here is a cross-release backport.
 | `tegra264-mb1-bct-pinmux-p3834-xxxx-p4071-0000.dtsi` | 61 changed pin blocks: CAN2/CAN3, eth0/eth3 MDIO+MDC, gen3/gen9 I2C, PWM2/3, DAP2/DAP6 audio |
 | `tegra264-mb1-bct-gpio-p3834-xxxx-p4071-0000.dtsi` | Carrier boot GPIO defaults — pin-header buffers and direction pins, internal USB VBUS enable, AON DI/DO inputs |
 | `tegra264-mb1-bct-prod-p3834-xxxx-p4071-0000.dts` | I2C1 drive-strength fix so MB1 can read the SoM EEPROM through the carrier's 1.8↔3.3V level shifter (NVIDIA bug 5459342) |
-| `tegra264-bpmp-3834-0008-4071-xxxx-adv.dtb` | Advantech's BPMP DTB — `pcie@3` enabled |
+| `tegra264-bpmp-3834-0008-4071-xxxx-adv.dtb` | Carrier BPMP DTB — `pcie@3` enabled *and* `uphy0-config` 7→6 |
 | `tegra264-mic-74x-carrier.dtbo` | The kernel-DT delta, as an overlay |
 | `carrier.env` | `CARRIER_FV_*` / `CARRIER_ENV_*` knobs |
 
@@ -47,8 +47,25 @@ forked 256KB DTBs:
 3. **`/dce@8808000000/sha-carveout`** — enabled.
 4. **`/sound`** — adds the internal-speaker widget and LOUTL/LOUTR routing on the RT5640.
 
-Enabling SATA needs all three of: `CARRIER_ENV_ODMDATA` (MB1 powers and maps the C3 UPHY
-lanes), `pcie@3` in the carrier BPMP DTB, and fragment 2 above. Advantech sets all three.
+Enabling SATA needs **three** coordinated settings, and missing any one stops the board
+before the kernel:
+
+1. `/uphy/uphy0-config = 6` in the carrier BPMP DTB — the UPHY lane map that includes
+   PCIe C3. Stock (and Advantech's own DTB on disk) ship `7`.
+2. `/pcie/pcie@3 status = "okay"` in the carrier BPMP DTB.
+3. `pcie@a808440000 status = "okay"` in the kernel DTB — fragment 2 above.
+
+Get it wrong and BPMP aborts with `PCIe(3): is enabled in DT without enabling it in UPHY
+DT`, which cascades into `BPMP firmware is not ready` and a BL31 `ASSERT` at
+`plat_setup.c:726`.
+
+Both BPMP properties are **baked into the carrier BPMP DTB** shipped here. Advantech
+instead leaves `uphy0-config` at 7 and relies on `ODMDATA` to patch it at flash time
+(`tegraflash_update_bpmp_dtb()` rewrites it from `--odmdata`). That does not work on the
+avocado flash path today — `initrd-flash.sh` sources `.env.initrd-flash` without exporting
+it, and `sign_binaries()` omits `ODMDATA` from its env prefix, so the helper sees an empty
+value and never passes `--odmdata`. Baking the values removes the dependency; `ODMDATA` is
+still set in `carrier.env` and sets exactly the same two values if that is ever fixed.
 
 **Verification.** The overlay was validated offline: applied to the stock R39.2.0
 `tegra264-p4071-0000+p3834-0008-nv.dtb` with `fdtoverlay`, the result reproduces
