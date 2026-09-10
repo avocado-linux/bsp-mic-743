@@ -1,13 +1,57 @@
-# bsp-mic-743
+# bsp-mic-743-at
 
-Board support for the **Advantech MIC-743** — the NVIDIA Jetson AGX Thor **T5000**
-(P3834-0008 CVM) variant of Advantech's MIC-74x industrial edge AI system.
+Board support for the **Advantech MIC-743-AT** — the non-GMSL member of Advantech's
+MIC-74x NVIDIA Jetson AGX Thor industrial edge AI family.
 
 Layers on top of the `jetson-agx-thor` target. 2026 feed only.
 
-The **MIC-742** is the same carrier with a T4000 (P3834-0000) module and has its own
-extension, [`bsp-mic-742`](https://github.com/avocado-linux/bsp-mic-742). The carrier
-half of the two is identical; only the module flashvars differ.
+One extension covers **both module SKUs** Advantech sells the product with:
+
+| Part number | Module | Memory |
+|---|---|---|
+| `MIC-743-AT7A1` | Jetson T5000 (P3834-0008 CVM) | 128GB |
+| `MIC-743-AT6A1` | Jetson T4000 (P3834-0000 CVM) | 64GB |
+
+The **MIC-742-AT** is the same P4071-class carrier plus 8 channels of GMSL2 over
+mini-FAKRA, and has its own extension,
+[`bsp-mic-742-at`](https://github.com/avocado-linux/bsp-mic-742-at).
+
+## Module SKU: detected, not pinned
+
+The T5000 and T4000 modules need different SDRAM training, PMIC and MISC BCTs, BPMP DTB
+and kernel DTB — flashing one with the other's is not a soft failure. This extension
+still ships one configuration for both, because `initrd-flash.sh` reads the module EEPROM
+before it prepares any flash binaries and retargets the module-specific files at
+whichever SKU it finds. Every one of them carries the SKU in its filename, so a single
+substitution over the `3834-<sku>` token covers all of them:
+
+```
+flashvars:          BCTFILE BPFDTB_FILE BPMP_MEM_CONFIG DTB_FILE
+                    MISC_CONFIG PMIC_CONFIG WB0SDRAM_BCT
+.env.initrd-flash:  DTBFILE EMC_BCT
+```
+
+`CHIP_SKU`, `RAMCODE` and `BPF_FILE` are already derived from the detected chip by
+meta-tegra's `tegra-flash-helper.sh`, and the `p3834-xxxx` BCTs are SOM-SKU independent,
+so nothing else has to move. This is the same rewrite meta-tegra does for the P3701
+family on Orin, which is what lets one `jetson-agx-orin` MACHINE flash a 32GB, 64GB or
+Industrial module.
+
+What that means for this extension:
+
+- `CARRIER_FV_CHECK_BOARDSKU` is **cleared**. `CARRIER_FV_CHECK_BOARDID="3834"` stays as
+  the module-family gate, and a P3834 SKU we ship no files for aborts the flash rather
+  than being guessed at — so clearing it loses no protection against a mis-flash.
+- **Both** carrier BPMP DTBs ship (`…-3834-0008-…-adv.dtb` and `…-3834-0000-…-adv.dtb`),
+  because the retarget picks between them by name.
+
+See `meta-avocado-nvidia/docs/adding-a-jetson-carrier.md`, section *Module SKU
+auto-detection (T264 / Thor)*.
+
+> **Not yet verified on a T4000.** The carrier and the T5000 path are hardware-verified;
+> the T4000 module path is derived from NVIDIA's own `p3834-0000-p4071-0000-nvme.conf` in
+> the same R39.2.0 BSP — exactly how L4T selects a T4000 — and from meta-tegra's existing
+> Orin precedent for detect-then-retarget. Flash an `AT6A1` and confirm.
 
 ## What this extension carries
 
@@ -25,7 +69,7 @@ nothing here is a cross-release backport.
 | `tegra264-mb1-bct-pinmux-p3834-xxxx-p4071-0000.dtsi` | 61 changed pin blocks: CAN2/CAN3, eth0/eth3 MDIO+MDC, gen3/gen9 I2C, PWM2/3, DAP2/DAP6 audio |
 | `tegra264-mb1-bct-gpio-p3834-xxxx-p4071-0000.dtsi` | Carrier boot GPIO defaults — pin-header buffers and direction pins, internal USB VBUS enable, AON DI/DO inputs |
 | `tegra264-mb1-bct-prod-p3834-xxxx-p4071-0000.dts` | I2C1 drive-strength fix so MB1 can read the SoM EEPROM through the carrier's 1.8↔3.3V level shifter (NVIDIA bug 5459342) |
-| `tegra264-bpmp-3834-0008-4071-xxxx-adv.dtb` | Carrier BPMP DTB — `pcie@3` enabled *and* `uphy0-config` 7→6 |
+| `tegra264-bpmp-3834-0008-4071-xxxx-adv.dtb`<br>`tegra264-bpmp-3834-0000-4071-xxxx-adv.dtb` | Carrier BPMP DTB — `pcie@3` enabled *and* `uphy0-config` 7→6. One per module SKU; the flash-time retarget picks by name |
 | `tegra264-mic-74x-carrier.dtbo` | The kernel-DT delta, as an overlay |
 | `carrier.env` | `CARRIER_FV_*` / `CARRIER_ENV_*` knobs |
 
@@ -38,8 +82,8 @@ convention) would orphan the include.
 
 The entire kernel-DT difference between the stock AGX Thor devkit DTB and the DTB
 Advantech ships is **four fragments**, and it is byte-identical between the T5000 and
-T4000 DTBs — which is why this is a 1KB overlay shared by both boards rather than two
-forked 256KB DTBs:
+T4000 DTBs — which is why this is a 1KB overlay shared by both module SKUs of both
+products rather than four forked 256KB DTBs:
 
 1. **`/bus@0/spi@810c440000/spi@0`** — retargets SPI2 CS0 from generic `tegra-spidev`
    to `infineon,slb9670` at 1MHz: the discrete TPM 2.0.
@@ -112,7 +156,7 @@ TPM2 salted + parameter-encrypted sessions for anything sensitive.
 
 ## Carrier hardware
 
-Confirmed on a running MIC-743:
+Confirmed on a running MIC-743-AT7A1:
 
 - Infineon SLB9670 TPM 2.0 (`spi2.0`, `/dev/tpm0`)
 - ASMedia ASM106x SATA AHCI on PCIe C3 (`0003:01:00.0`)
@@ -130,15 +174,25 @@ SATA needs no kernel modules — this kernel has `CONFIG_ATA=y`, `CONFIG_SATA_AH
 > (`usbserial` → `usb-wwan` → `option`) works today. Enabling QMI is a 3-line config
 > fragment in `meta-avocado`, not something this extension can fix.
 
+## Known module-dependent gap: fan control
+
+`tegra-nvfancontrol` installs a single `/etc/nvfancontrol.conf`, chosen at **build** time
+from the MACHINE's `NVFANCONTROL` — the T5000 profile
+(`nvfancontrol_p3834_0008_p4071_0000`) for `jetson-agx-thor`. A T4000 therefore runs the
+T5000 fan curve.
+
+This is a fan table, not a boot dependency, and no extension can fix it: the package is
+built once per MACHINE, so the fix belongs in `meta-avocado` if it ever matters.
+
 ## Using this extension
 
-`bsp-mic-743` is an [Avocado](https://avocadolinux.org) extension — a reusable fragment of
+`bsp-mic-743-at` is an [Avocado](https://avocadolinux.org) extension — a reusable fragment of
 build- and runtime-configuration that you compose into your own Avocado project. To use it,
 declare it as a package-sourced extension in your `avocado.yaml` and add it to a runtime:
 
 ```yaml
 extensions:
-  avocado-bsp-mic-743:
+  avocado-bsp-mic-743-at:
     source:
       type: package
       version: "*"        # or pin an exact version
@@ -146,7 +200,7 @@ extensions:
 runtimes:
   my-runtime:
     extensions:
-      - avocado-bsp-mic-743
+      - avocado-bsp-mic-743-at
 ```
 
 Then install and build:
