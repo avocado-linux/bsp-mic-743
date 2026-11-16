@@ -15,18 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   P3834-0000). The 742/743 split was previously drawn along the module SKU,
   which was wrong: 742 vs 743 is a carrier difference (the 742 adds 8-channel
   GMSL2), and the module is the `AT7A1`/`AT6A1` suffix on either product.
+- `CARRIER_FV_CHECK_BOARDSKU` is now empty; it pinned the T5000 (`0008`).
+  `CARRIER_FV_CHECK_BOARDID` (`3834`) stays as the module-family gate, and
+  `initrd-flash.sh` refuses a P3834 SKU it ships no files for, so nothing is lost
+  against a mis-flash.
+- `CARRIER_FV_BPFDTB_FILE` keeps the T5000 (`3834-0008`) name; on a T4000,
+  `initrd-flash.sh` retargets it from the module EEPROM to the `3834-0000` copy.
+  Requires meta-avocado with `retarget_module_sku_t264` in `initrd-flash.sh`.
 
 ### Added
 - `tegra264-bpmp-3834-0000-4071-xxxx-adv.dtb` alongside the `-0008-` one, so the
   flash-time module retarget has a carrier BPMP DTB for either module.
-
-### Removed
-- `CARRIER_FV_CHECK_BOARDSKU`, which pinned the T5000. `CARRIER_FV_CHECK_BOARDID`
-  (`3834`) stays as the module-family gate, and `initrd-flash.sh` refuses a P3834
-  SKU it ships no files for, so nothing is lost against a mis-flash.
-- The T5000-specific `CARRIER_FV_*` module block; `initrd-flash.sh` retargets
-  those files from the module EEPROM instead. Requires meta-avocado with
-  `retarget_module_sku_t264` in `initrd-flash.sh`.
 
 ### Notes
 - The T4000 path is not hardware-verified. It is derived from NVIDIA's
