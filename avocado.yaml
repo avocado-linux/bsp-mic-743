@@ -46,7 +46,7 @@ extensions:
       10GbE + Realtek r8126, 4x CAN (mttcan), 4x ttyS, RT5640 audio, AT24
       EEPROMs, TMP451/LM90, INA3221/INA238.
     license: Apache-2.0
-    url: https://github.com/avocadolinux/avocado-os
+    url: https://github.com/avocado-linux/bsp-mic-743
     vendor: Avocado Linux <info@avocadolinux.org>
 
     types:
