@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Renamed** to `avocado-bsp-mic-743-at` (was `avocado-bsp-mic-743`), matching
-  Advantech's product name. `/etc/hostname` is now `mic-743-at`, and the board
-  name to build against is `mic-743-at`.
+  Advantech's product name. `/etc/hostname` is now `mic-743-at`. The build
+  target is unchanged: still `jetson-agx-thor`.
+  **Migration:** a project that names the old key `avocado-bsp-mic-743` keeps
+  resolving 0.1.0. Rename it to `avocado-bsp-mic-743-at` in `extensions:` and in
+  each runtime's extension list to get 0.2.0 and later.
 - **The module SKU is now detected, not pinned.** One extension serves both
   `MIC-743-AT7A1` (Jetson T5000, P3834-0008) and `MIC-743-AT6A1` (Jetson T4000,
   P3834-0000). The 742/743 split was previously drawn along the module SKU,
@@ -18,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CARRIER_FV_CHECK_BOARDSKU` is now empty; it pinned the T5000 (`0008`).
   `CARRIER_FV_CHECK_BOARDID` (`3834`) stays as the module-family gate, and
   `initrd-flash.sh` refuses a P3834 SKU it ships no files for, so nothing is lost
-  against a mis-flash.
+  against a mis-flash. That refusal comes from meta-avocado wrynose #378; an
+  older layer has no such check.
 - `CARRIER_FV_BPFDTB_FILE` keeps the T5000 (`3834-0008`) name; on a T4000,
   `initrd-flash.sh` retargets it from the module EEPROM to the `3834-0000` copy.
   Requires meta-avocado with `retarget_module_sku_t264` in `initrd-flash.sh`.

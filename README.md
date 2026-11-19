@@ -42,6 +42,8 @@ What that means for this extension:
 - `CARRIER_FV_CHECK_BOARDSKU` is **cleared**. `CARRIER_FV_CHECK_BOARDID="3834"` stays as
   the module-family gate, and a P3834 SKU we ship no files for aborts the flash rather
   than being guessed at — so clearing it loses no protection against a mis-flash.
+  That refusal is meta-avocado wrynose #378's; on a layer without it, the cleared SKU
+  pin is the only change.
 - **Both** carrier BPMP DTBs ship (`…-3834-0008-…-adv.dtb` and `…-3834-0000-…-adv.dtb`),
   because the retarget picks between them by name.
 
